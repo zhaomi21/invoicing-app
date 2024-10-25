@@ -50,7 +50,7 @@ function InvoicePreviewModal({ isOpen, onClose, children }: { isOpen: boolean; o
 
   if (!isOpen) return null;
 
-  const applyStyle = (content) => {
+  const applyStyle = (content: React.ReactNode) => {
     switch (selectedStyle) {
       case 'modern':
         return <div className="bg-gray-100 text-gray-800 font-sans">{content}</div>;
@@ -741,7 +741,13 @@ export default function CreateInvoice() {
             <div className={`flex justify-between items-start mb-12 ${style === 'minimalist' ? '' : 'border-b pb-6'}`}>
               <div className="w-1/3">
                 {logoPreview && (
-                  <img src={logoPreview} alt="Company Logo" className="max-w-full h-auto max-h-24" />
+                  <Image 
+                    src={logoPreview} 
+                    alt="Company Logo" 
+                    width={100}
+                    height={100}
+                    className="max-w-full h-auto max-h-24"
+                  />
                 )}
               </div>
               <div className="w-2/3 text-right">
