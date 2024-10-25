@@ -45,6 +45,61 @@ function Portal({ children }: { children: React.ReactNode }) {
     : null;
 }
 
+function InvoicePreviewModal({ isOpen, onClose, children }) {
+  const [selectedStyle, setSelectedStyle] = useState('classic');
+
+  if (!isOpen) return null;
+
+  const applyStyle = (content) => {
+    switch (selectedStyle) {
+      case 'modern':
+        return <div className="bg-gray-100 text-gray-800 font-sans">{content}</div>;
+      case 'minimalist':
+        return <div className="bg-white text-gray-900 font-mono">{content}</div>;
+      case 'classic':
+      default:
+        return <div className="bg-white text-gray-800 font-serif">{content}</div>;
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-auto">
+      <div className="bg-white shadow-xl max-h-full overflow-auto relative">
+        <div className="sticky top-0 bg-white z-10 p-4 border-b flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Invoice Preview (A4)</h2>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setSelectedStyle('classic')}
+              className={`px-3 py-1 rounded ${selectedStyle === 'classic' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            >
+              Classic
+            </button>
+            <button
+              onClick={() => setSelectedStyle('modern')}
+              className={`px-3 py-1 rounded ${selectedStyle === 'modern' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            >
+              Modern
+            </button>
+            <button
+              onClick={() => setSelectedStyle('minimalist')}
+              className={`px-3 py-1 rounded ${selectedStyle === 'minimalist' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            >
+              Minimalist
+            </button>
+          </div>
+          <button onClick={onClose} className="text-2xl">&times;</button>
+        </div>
+        <div className="w-[210mm] h-[297mm] mx-auto bg-white shadow-lg overflow-hidden">
+          <div className="w-full h-full p-[1cm] overflow-auto">
+            {applyStyle(children(selectedStyle))}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function CreateInvoice() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,6 +134,10 @@ export default function CreateInvoice() {
   const [isDateOptionsVisible, setIsDateOptionsVisible] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
   const [invoiceDate, setInvoiceDate] = useState<string>('');
+  const [footerContent, setFooterContent] = useState('');
+  const [discountRate, setDiscountRate] = useState<number>(0);
+  const [isDiscountEnabled, setIsDiscountEnabled] = useState<boolean>(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -156,15 +215,26 @@ export default function CreateInvoice() {
 
   const handleLineItemChange = (index: number, field: keyof LineItem, value: string | number) => {
     const newLineItems = [...lineItems];
-    newLineItems[index] = { ...newLineItems[index], [field]: value };
+    if (field === 'quantity' || field === 'rate') {
+      // Convert to number and handle invalid input
+      const numValue = parseFloat(value as string);
+      newLineItems[index] = { 
+        ...newLineItems[index], 
+        [field]: isNaN(numValue) ? 0 : numValue 
+      };
+    } else {
+      newLineItems[index] = { ...newLineItems[index], [field]: value };
+    }
     setLineItems(newLineItems);
   };
 
   const calculateTotals = () => {
     const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.rate, 0);
-    const taxAmount = isTaxEnabled ? subtotal * (taxRate / 100) : 0;
-    const total = subtotal + taxAmount;
-    return { subtotal, taxAmount, total };
+    const discountAmount = isDiscountEnabled ? subtotal * (discountRate / 100) : 0;
+    const discountedSubtotal = subtotal - discountAmount;
+    const taxAmount = isTaxEnabled ? discountedSubtotal * (taxRate / 100) : 0;
+    const total = discountedSubtotal + taxAmount;
+    return { subtotal, discountAmount, discountedSubtotal, taxAmount, total };
   };
 
   const generateInvoiceNumber = () => {
@@ -228,6 +298,9 @@ export default function CreateInvoice() {
       </Portal>
     );
   };
+
+  const openPreview = () => setIsPreviewOpen(true);
+  const closePreview = () => setIsPreviewOpen(false);
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
@@ -524,52 +597,260 @@ export default function CreateInvoice() {
                   Add Line Item
                 </button>
               </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <div className="w-1/3">
-                <div className="border-t border-gray-200 pt-4">
-                  <div className="flex justify-between mb-2">
-                    <span className="font-medium">Subtotal:</span>
-                    <span className="text-black">${calculateTotals().subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex items-center mb-2">
-                    <input
-                      type="checkbox"
-                      id="taxToggle"
-                      checked={isTaxEnabled}
-                      onChange={(e) => setIsTaxEnabled(e.target.checked)}
-                      className="mr-2"
-                    />
-                    <label htmlFor="taxToggle" className="mr-2 text-black">Add Tax</label>
-                    {isTaxEnabled && (
-                      <input
-                        type="number"
-                        value={taxRate}
-                        onChange={(e) => setTaxRate(Number(e.target.value))}
-                        className="w-16 p-1 border border-gray-300 rounded text-right text-black"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                      />
-                    )}
-                    {isTaxEnabled && <span className="ml-1 text-black">%</span>}
-                  </div>
-                  {isTaxEnabled && (
+              <div className="mt-6 flex justify-end px-4">
+                <div className="w-1/3">
+                  <div className="border-t border-gray-200 pt-4">
                     <div className="flex justify-between mb-2">
-                      <span className="font-medium">Tax:</span>
-                      <span className="text-black">${calculateTotals().taxAmount.toFixed(2)}</span>
+                      <span className="font-medium">Subtotal:</span>
+                      <span className="text-black">${calculateTotals().subtotal.toFixed(2)}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between border-t border-gray-200 pt-2 mt-2">
-                    <span className="font-bold">Total:</span>
-                    <span className="font-bold text-black">${calculateTotals().total.toFixed(2)}</span>
+                    <div className="flex items-center mb-2">
+                      <input
+                        type="checkbox"
+                        id="discountToggle"
+                        checked={isDiscountEnabled}
+                        onChange={(e) => setIsDiscountEnabled(e.target.checked)}
+                        className="mr-2"
+                      />
+                      <label htmlFor="discountToggle" className="mr-2 text-black">Add Discount</label>
+                      {isDiscountEnabled && (
+                        <>
+                          <input
+                            type="number"
+                            value={discountRate}
+                            onChange={(e) => setDiscountRate(Number(e.target.value))}
+                            className="w-16 p-1 border border-gray-300 rounded text-right text-black"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                          />
+                          <span className="ml-1 text-black">%</span>
+                        </>
+                      )}
+                    </div>
+                    {isDiscountEnabled && (
+                      <div className="flex justify-between mb-2">
+                        <span className="font-medium">Discount ({discountRate}%):</span>
+                        <span className="text-black">-${calculateTotals().discountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center mb-2">
+                      <input
+                        type="checkbox"
+                        id="taxToggle"
+                        checked={isTaxEnabled}
+                        onChange={(e) => setIsTaxEnabled(e.target.checked)}
+                        className="mr-2"
+                      />
+                      <label htmlFor="taxToggle" className="mr-2 text-black">Add Tax</label>
+                      {isTaxEnabled && (
+                        <input
+                          type="number"
+                          value={taxRate}
+                          onChange={(e) => setTaxRate(Number(e.target.value))}
+                          className="w-16 p-1 border border-gray-300 rounded text-right text-black"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
+                      )}
+                      {isTaxEnabled && <span className="ml-1 text-black">%</span>}
+                    </div>
+                    {isTaxEnabled && (
+                      <div className="flex justify-between mb-2">
+                        <span className="font-medium">Tax:</span>
+                        <span className="text-black">${calculateTotals().taxAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-t border-gray-200 pt-2 mt-2">
+                      <span className="font-bold">Total:</span>
+                      <span className="font-bold text-black">${calculateTotals().total.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Add the invoice footer input here */}
+              <div className="mt-8 px-4 pb-4 border-t border-gray-200 pt-4">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Invoice Footer</h3>
+                <textarea
+                  value={footerContent}
+                  onChange={(e) => setFooterContent(e.target.value)}
+                  placeholder="Enter notes, terms, payment instructions, etc."
+                  className="w-full p-3 border border-gray-300 rounded-md text-black min-h-[100px] focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
             </div>
           </div>
         </div>
+
+        {/* Add this new div for the Preview and Save and continue buttons */}
+        <div className="mt-8 mb-16 flex justify-end space-x-4">
+          <button
+            onClick={openPreview}
+            className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-full shadow-lg flex items-center transition-colors duration-300"
+          >
+            Preview
+            <svg
+              className="w-5 h-5 ml-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+              />
+            </svg>
+          </button>
+          <button
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full shadow-lg flex items-center transition-colors duration-300"
+          >
+            Save and continue
+            <svg
+              className="w-5 h-5 ml-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M14 5l7 7m0 0l-7 7m7-7H3"
+              />
+            </svg>
+          </button>
+        </div>
       </main>
+
+      <InvoicePreviewModal isOpen={isPreviewOpen} onClose={closePreview}>
+        {(style) => (
+          <div className={`flex flex-col h-full ${style === 'modern' ? 'bg-gray-100' : 'bg-white'}`}>
+            {/* Top section */}
+            <div className={`flex justify-between items-start mb-12 ${style === 'minimalist' ? '' : 'border-b pb-6'}`}>
+              <div className="w-1/3">
+                {logoPreview && (
+                  <img src={logoPreview} alt="Company Logo" className="max-w-full h-auto max-h-24" />
+                )}
+              </div>
+              <div className="w-2/3 text-right">
+                <span className={`text-4xl font-extrabold ${style === 'modern' ? 'text-blue-600' : 'text-gray-700'} tracking-tight`}>INVOICE</span>
+                <div className={`mt-2 ${style === 'minimalist' ? 'text-xs' : 'text-sm'}`}>
+                  <p className="font-semibold">{businessDetails.name}</p>
+                  <p>{businessDetails.streetAddress}</p>
+                  <p>
+                    {[
+                      businessDetails.city,
+                      businessDetails.stateProvince,
+                      businessDetails.postalCode,
+                      businessDetails.country
+                    ].filter(Boolean).join(', ')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Customer and Invoice Details */}
+            <div className="flex justify-between mb-12">
+              <div className="w-1/2">
+                <h3 className={`${style === 'minimalist' ? 'text-base' : 'text-lg'} font-semibold mb-3`}>Bill To:</h3>
+                <div className={style === 'minimalist' ? 'text-xs' : 'text-sm'}>
+                  {customerDetails.businessName && <p className="font-semibold">{customerDetails.businessName}</p>}
+                  <p>{`${customerDetails.firstName} ${customerDetails.lastName}`}</p>
+                  {customerDetails.email && <p>{customerDetails.email}</p>}
+                  {customerDetails.streetAddress && <p>{customerDetails.streetAddress}</p>}
+                  <p>
+                    {[
+                      customerDetails.city,
+                      customerDetails.stateProvince,
+                      customerDetails.postalCode,
+                      customerDetails.country
+                    ].filter(Boolean).join(', ')}
+                  </p>
+                </div>
+              </div>
+              <div className="w-1/2 text-right">
+                <div className={`${style === 'modern' ? 'bg-white' : 'bg-gray-100'} p-4 rounded-lg`}>
+                  <p className="mb-2"><span className="font-semibold">Invoice Number:</span> {invoiceNumber}</p>
+                  <p className="mb-2"><span className="font-semibold">Invoice Date:</span> {invoiceDate}</p>
+                  <p><span className="font-semibold">Payment Due:</span> {paymentDueDate}</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Invoice Line Items */}
+            <table className="w-full mb-12 text-xs">
+              <thead>
+                <tr className={`${style === 'modern' ? 'bg-blue-100' : 'bg-gray-200'}`}>
+                  <th className="px-3 py-2 text-left font-semibold w-2/5">Item</th>
+                  <th className="px-3 py-2 text-left font-semibold w-2/5">Description</th>
+                  <th className="px-3 py-2 text-right font-semibold w-16">Quantity</th>
+                  <th className="px-3 py-2 text-right font-semibold w-24">Rate/Price</th>
+                  <th className="px-3 py-2 text-right font-semibold w-24">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineItems.map((item, index) => (
+                  <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                    <td className="px-3 py-2 align-top">{item.item}</td>
+                    <td className="px-3 py-2 align-top">{item.description}</td>
+                    <td className="px-3 py-2 text-right align-top">{item.quantity}</td>
+                    <td className="px-3 py-2 text-right align-top">${item.rate.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-right align-top">${(item.quantity * item.rate).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Totals */}
+            <div className="flex justify-end mb-12">
+              <div className="w-1/3">
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="flex justify-between mb-2 text-sm">
+                    <span className="font-medium">Subtotal:</span>
+                    <span>${calculateTotals().subtotal.toFixed(2)}</span>
+                  </div>
+                  {isDiscountEnabled && (
+                    <div className="flex justify-between mb-2 text-sm">
+                      <span className="font-medium">Discount ({discountRate}%):</span>
+                      <span className="text-red-600">-${calculateTotals().discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {isTaxEnabled && (
+                    <div className="flex justify-between mb-2 text-sm">
+                      <span className="font-medium">Tax ({taxRate}%):</span>
+                      <span>${calculateTotals().taxAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className={`flex justify-between border-t border-gray-200 pt-2 mt-2 ${style === 'modern' ? 'text-blue-600' : ''}`}>
+                    <span className="font-bold text-lg">Total:</span>
+                    <span className="font-bold text-lg">${calculateTotals().total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            {footerContent && (
+              <div className={`mt-auto ${style === 'minimalist' ? '' : 'border-t'} border-gray-200 pt-6`}>
+                <h3 className={`${style === 'minimalist' ? 'text-base' : 'text-lg'} font-semibold mb-2`}>Notes:</h3>
+                <p className={`whitespace-pre-wrap ${style === 'minimalist' ? 'text-xs' : 'text-sm'}`}>{footerContent}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </InvoicePreviewModal>
 
       {/* Modal for business details */}
       {isModalOpen && (
