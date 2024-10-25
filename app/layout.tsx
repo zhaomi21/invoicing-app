@@ -1,12 +1,17 @@
-import type { Metadata } from "next";
-import localFont from "next/font/local";
-import "./globals.css";
-import { geistSans } from './fonts'
+import { Pangolin } from 'next/font/google'
+import './globals.css'
 
-export const metadata: Metadata = {
-  title: "Invoicing App",
-  description: "Create and manage invoices easily",
-};
+const pangolin = Pangolin({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-pangolin',
+  display: 'swap',
+})
+
+export const metadata = {
+  title: 'Invoicing App',
+  description: 'Create and manage invoices easily',
+}
 
 export default function RootLayout({
   children,
@@ -14,8 +19,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={geistSans.className}>
-      <body>{children}</body>
+    <html lang="en" className={`${pangolin.variable}`}>
+      <body>
+        {children}
+      </body>
     </html>
   )
 }
