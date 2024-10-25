@@ -154,6 +154,38 @@ interface RecurrenceSettings {
   numberOfOccurrences: number | null;
 }
 
+const saveInvoiceData = () => {
+  // Generate a unique ID for the invoice
+  const invoiceId = Date.now().toString();
+  
+  // Create an object with all the invoice data
+  const invoiceData = {
+    id: invoiceId,
+    businessDetails,
+    customerDetails,
+    lineItems,
+    taxRate,
+    isTaxEnabled,
+    invoiceNumber,
+    paymentDueDate,
+    invoiceDate,
+    footerContent,
+    discountRate,
+    isDiscountEnabled,
+    selectedCurrency,
+    // Add any other relevant data
+  };
+
+  // In a real application, you would save this data to a database or API
+  // For now, we'll just log it to the console
+  console.log('Saving invoice data:', invoiceData);
+
+  // You could also save it to localStorage for persistence across page reloads
+  localStorage.setItem(`invoice_${invoiceId}`, JSON.stringify(invoiceData));
+
+  return invoiceId;
+};
+
 export default function CreateInvoice() {
   const router = useRouter();
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -478,7 +510,7 @@ export default function CreateInvoice() {
     
     // Navigate to the send-invoice page with the invoice ID
     router.push(`/send-invoice?id=${invoiceId}`);
-  }, [router]);
+  }, [router, businessDetails, customerDetails, lineItems, taxRate, isTaxEnabled, invoiceNumber, paymentDueDate, invoiceDate, footerContent, discountRate, isDiscountEnabled, selectedCurrency]);
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
