@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from "next/link";
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
@@ -31,6 +31,33 @@ interface LineItem {
   quantity: number;
   rate: number;
 }
+
+interface Currency {
+  code: string;
+  name: string;
+  symbol: string;
+}
+
+// Add this new interface for the saved product/service
+interface SavedItem {
+  item: string;
+  description: string;
+  rate: number;
+}
+
+// Update the commonCurrencies array with CAD at the top and $ as the symbol
+const commonCurrencies: Currency[] = [
+  { code: 'CAD', name: 'Canadian Dollar', symbol: '$' },
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'GBP', name: 'British Pound', symbol: '£' },
+  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+  { code: 'SEK', name: 'Swedish Krona', symbol: 'kr' },
+  { code: 'NZD', name: 'New Zealand Dollar', symbol: 'NZ$' },
+];
 
 function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -90,8 +117,25 @@ function InvoicePreviewModal({ isOpen, onClose, children }: { isOpen: boolean; o
           <button onClick={onClose} className="text-2xl">&times;</button>
         </div>
         <div className="w-[210mm] h-[297mm] mx-auto bg-white shadow-lg overflow-hidden">
-          <div className="w-full h-full p-[1cm] overflow-auto">
-            {applyStyle(children(selectedStyle))}
+          <div className="w-full h-full p-[1cm] overflow-auto flex flex-col">
+            {applyStyle(
+              <>
+                {children(selectedStyle)}
+                <Link href="https://trackinvoicing.com" target="_blank" rel="noopener noreferrer" className="mt-auto">
+                  <div className="h-16 border-t border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors duration-300">
+                    <div className="flex items-center justify-center h-full space-x-4">
+                      <span className="text-lg font-semibold text-gray-700">Powered by</span>
+                      <Image
+                        src="/logo.svg"  // Make sure this path is correct
+                        alt="Track Invoicing Logo"
+                        width={150}
+                        height={40}
+                      />
+                    </div>
+                  </div>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -138,6 +182,35 @@ export default function CreateInvoice() {
   const [discountRate, setDiscountRate] = useState<number>(0);
   const [isDiscountEnabled, setIsDiscountEnabled] = useState<boolean>(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(commonCurrencies[0]);
+  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [currentSaveItem, setCurrentSaveItem] = useState<SavedItem>({ item: '', description: '', rate: 0 });
+
+  console.log('Component rendering');
+
+  const openSaveModal = useCallback((item: LineItem) => {
+    console.log('openSaveModal called with item:', item);
+    setCurrentSaveItem({
+      item: item.item,
+      description: item.description,
+      rate: item.rate
+    });
+    setIsSaveModalOpen(true);
+  }, []);
+
+  const closeSaveModal = useCallback(() => {
+    setIsSaveModalOpen(false);
+    setCurrentSaveItem({ item: '', description: '', rate: 0 });
+  }, []);
+
+  const handleSaveItem = useCallback((e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSavedItems(prevItems => [...prevItems, currentSaveItem]);
+    closeSaveModal();
+  }, [currentSaveItem, closeSaveModal]);
+
+  console.log('openSaveModal function:', openSaveModal);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -476,7 +549,7 @@ export default function CreateInvoice() {
                 </button>
               </div>
               <div className="w-1/2 pl-3 flex flex-col justify-start items-end">
-                <div className="text-right">
+                <div className="text-right w-full">
                   <div className="mb-2">
                     <label htmlFor="invoiceNumber" className="text-sm font-medium text-gray-700">Invoice Number:</label>
                     <input
@@ -521,6 +594,21 @@ export default function CreateInvoice() {
                       {isDateOptionsVisible && <QuickDateOptions />}
                     </div>
                   </div>
+                  <div className="mb-2">
+                    <label htmlFor="currency" className="text-sm font-medium text-gray-700">Currency:</label>
+                    <select
+                      id="currency"
+                      value={selectedCurrency.code}
+                      onChange={(e) => setSelectedCurrency(commonCurrencies.find(c => c.code === e.target.value) || commonCurrencies[0])}
+                      className="ml-2 p-1 border border-gray-300 rounded-md text-sm text-black"
+                    >
+                      {commonCurrencies.map((currency) => (
+                        <option key={currency.code} value={currency.code}>
+                          {currency.symbol} {currency.code} - {currency.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -533,7 +621,7 @@ export default function CreateInvoice() {
                     <th className="px-4 py-2 text-left font-bold text-black">Item</th>
                     <th className="px-4 py-2 text-left font-bold text-black w-1/3">Description (optional)</th>
                     <th className="px-4 py-2 text-right font-bold text-black w-24">Quantity</th>
-                    <th className="px-4 py-2 text-right font-bold text-black w-32">Rate/Price</th>
+                    <th className="px-4 py-2 text-right font-bold text-black w-32">Rate/Price ({selectedCurrency.symbol})</th>
                     <th className="px-4 py-2 text-right font-bold text-black w-32">Amount</th>
                     <th className="px-4 py-2 font-bold text-black w-24"></th>
                   </tr>
@@ -567,23 +655,40 @@ export default function CreateInvoice() {
                         />
                       </td>
                       <td className="px-4 py-2 align-top">
-                        <input
-                          type="number"
-                          value={item.rate}
-                          onChange={(e) => handleLineItemChange(index, 'rate', e.target.value)}
-                          className="w-full p-1 border border-gray-300 rounded text-right text-black"
-                          step="0.01"
-                        />
+                        <div className="flex items-center">
+                          <span className="mr-1">{selectedCurrency.symbol}</span>
+                          <input
+                            type="number"
+                            value={item.rate}
+                            onChange={(e) => handleLineItemChange(index, 'rate', e.target.value)}
+                            className="w-full p-1 border border-gray-300 rounded text-right text-black"
+                            step="0.01"
+                          />
+                        </div>
                       </td>
                       <td className="px-4 py-2 text-right align-top text-black">
-                        {(item.quantity * item.rate).toFixed(2)}
+                        {selectedCurrency.symbol}{(item.quantity * item.rate).toFixed(2)}
                       </td>
                       <td className="px-4 py-2 align-top">
-                        {lineItems.length > 1 && (
-                          <button onClick={() => removeLineItem(index)} className="text-red-500 hover:text-red-700">
-                            Remove
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              console.log('Save button clicked', item);
+                              openSaveModal(item);
+                            }}
+                            className="text-blue-500 hover:text-blue-700"
+                          >
+                            Save
                           </button>
-                        )}
+                          {lineItems.length > 1 && (
+                            <button 
+                              onClick={() => removeLineItem(index)} 
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -602,7 +707,7 @@ export default function CreateInvoice() {
                   <div className="border-t border-gray-200 pt-4">
                     <div className="flex justify-between mb-2">
                       <span className="font-medium">Subtotal:</span>
-                      <span className="text-black">${calculateTotals().subtotal.toFixed(2)}</span>
+                      <span className="text-black">{selectedCurrency.symbol}{calculateTotals().subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex items-center mb-2">
                       <input
@@ -631,7 +736,7 @@ export default function CreateInvoice() {
                     {isDiscountEnabled && (
                       <div className="flex justify-between mb-2">
                         <span className="font-medium">Discount ({discountRate}%):</span>
-                        <span className="text-black">-${calculateTotals().discountAmount.toFixed(2)}</span>
+                        <span className="text-black">-{selectedCurrency.symbol}{calculateTotals().discountAmount.toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex items-center mb-2">
@@ -659,12 +764,12 @@ export default function CreateInvoice() {
                     {isTaxEnabled && (
                       <div className="flex justify-between mb-2">
                         <span className="font-medium">Tax:</span>
-                        <span className="text-black">${calculateTotals().taxAmount.toFixed(2)}</span>
+                        <span className="text-black">{selectedCurrency.symbol}{calculateTotals().taxAmount.toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between border-t border-gray-200 pt-2 mt-2">
                       <span className="font-bold">Total:</span>
-                      <span className="font-bold text-black">${calculateTotals().total.toFixed(2)}</span>
+                      <span className="font-bold text-black">{selectedCurrency.symbol}{calculateTotals().total.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -790,7 +895,8 @@ export default function CreateInvoice() {
                 <div className={`${style === 'modern' ? 'bg-white' : 'bg-gray-100'} p-4 rounded-lg`}>
                   <p className="mb-2"><span className="font-semibold">Invoice Number:</span> {invoiceNumber}</p>
                   <p className="mb-2"><span className="font-semibold">Invoice Date:</span> {invoiceDate}</p>
-                  <p><span className="font-semibold">Payment Due:</span> {paymentDueDate}</p>
+                  <p className="mb-2"><span className="font-semibold">Payment Due:</span> {paymentDueDate}</p>
+                  <p><span className="font-semibold">Currency:</span> {selectedCurrency.code} ({selectedCurrency.symbol})</p>
                 </div>
               </div>
             </div>
@@ -802,7 +908,7 @@ export default function CreateInvoice() {
                   <th className="px-3 py-2 text-left font-semibold w-2/5">Item</th>
                   <th className="px-3 py-2 text-left font-semibold w-2/5">Description</th>
                   <th className="px-3 py-2 text-right font-semibold w-16">Quantity</th>
-                  <th className="px-3 py-2 text-right font-semibold w-24">Rate/Price</th>
+                  <th className="px-3 py-2 text-right font-semibold w-24">Rate/Price ({selectedCurrency.code})</th>
                   <th className="px-3 py-2 text-right font-semibold w-24">Amount</th>
                 </tr>
               </thead>
@@ -812,8 +918,8 @@ export default function CreateInvoice() {
                     <td className="px-3 py-2 align-top">{item.item}</td>
                     <td className="px-3 py-2 align-top">{item.description}</td>
                     <td className="px-3 py-2 text-right align-top">{item.quantity}</td>
-                    <td className="px-3 py-2 text-right align-top">${item.rate.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-right align-top">${(item.quantity * item.rate).toFixed(2)}</td>
+                    <td className="px-3 py-2 text-right align-top">{selectedCurrency.symbol}{item.rate.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-right align-top">{selectedCurrency.symbol}{(item.quantity * item.rate).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -825,23 +931,23 @@ export default function CreateInvoice() {
                 <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between mb-2 text-sm">
                     <span className="font-medium">Subtotal:</span>
-                    <span>${calculateTotals().subtotal.toFixed(2)}</span>
+                    <span>{selectedCurrency.symbol}{calculateTotals().subtotal.toFixed(2)} {selectedCurrency.code}</span>
                   </div>
                   {isDiscountEnabled && (
                     <div className="flex justify-between mb-2 text-sm">
                       <span className="font-medium">Discount ({discountRate}%):</span>
-                      <span className="text-red-600">-${calculateTotals().discountAmount.toFixed(2)}</span>
+                      <span className="text-red-600">-{selectedCurrency.symbol}{calculateTotals().discountAmount.toFixed(2)} {selectedCurrency.code}</span>
                     </div>
                   )}
                   {isTaxEnabled && (
                     <div className="flex justify-between mb-2 text-sm">
                       <span className="font-medium">Tax ({taxRate}%):</span>
-                      <span>${calculateTotals().taxAmount.toFixed(2)}</span>
+                      <span>{selectedCurrency.symbol}{calculateTotals().taxAmount.toFixed(2)} {selectedCurrency.code}</span>
                     </div>
                   )}
                   <div className={`flex justify-between border-t border-gray-200 pt-2 mt-2 ${style === 'modern' ? 'text-blue-600' : ''}`}>
                     <span className="font-bold text-lg">Total:</span>
-                    <span className="font-bold text-lg">${calculateTotals().total.toFixed(2)}</span>
+                    <span className="font-bold text-lg">{selectedCurrency.symbol}{calculateTotals().total.toFixed(2)} {selectedCurrency.code}</span>
                   </div>
                 </div>
               </div>
@@ -1085,6 +1191,71 @@ export default function CreateInvoice() {
                 <button
                   type="button"
                   onClick={closeCustomerModal}
+                  className="mr-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add this new modal for saving items */}
+      {isSaveModalOpen && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-4 text-black">Save product/service</h2>
+            <form onSubmit={handleSaveItem}>
+              <div className="mb-4">
+                <label htmlFor="saveItem" className="block text-sm font-medium text-gray-700 mb-1">
+                  Item
+                </label>
+                <input
+                  type="text"
+                  id="saveItem"
+                  value={currentSaveItem.item}
+                  onChange={(e) => setCurrentSaveItem({...currentSaveItem, item: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-md text-black"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="saveDescription" className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  id="saveDescription"
+                  value={currentSaveItem.description}
+                  onChange={(e) => setCurrentSaveItem({...currentSaveItem, description: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-md text-black"
+                  rows={3}
+                />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="saveRate" className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit Price ({selectedCurrency.symbol})
+                </label>
+                <input
+                  type="number"
+                  id="saveRate"
+                  value={currentSaveItem.rate}
+                  onChange={(e) => setCurrentSaveItem({...currentSaveItem, rate: parseFloat(e.target.value)})}
+                  className="w-full p-2 border border-gray-300 rounded-md text-black"
+                  step="0.01"
+                  required
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={closeSaveModal}
                   className="mr-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
                 >
                   Cancel
