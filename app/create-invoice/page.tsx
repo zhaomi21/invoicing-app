@@ -183,7 +183,6 @@ export default function CreateInvoice() {
   const [isDiscountEnabled, setIsDiscountEnabled] = useState<boolean>(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(commonCurrencies[0]);
-  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [currentSaveItem, setCurrentSaveItem] = useState<SavedItem>({ item: '', description: '', rate: 0 });
 
