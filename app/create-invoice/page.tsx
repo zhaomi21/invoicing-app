@@ -203,12 +203,6 @@ export default function CreateInvoice() {
     setCurrentSaveItem({ item: '', description: '', rate: 0 });
   }, []);
 
-  const handleSaveItem = useCallback((e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSavedItems(prevItems => [...prevItems, currentSaveItem]);
-    closeSaveModal();
-  }, [currentSaveItem, closeSaveModal]);
-
   console.log('openSaveModal function:', openSaveModal);
 
   useEffect(() => {
@@ -380,7 +374,7 @@ export default function CreateInvoice() {
         <div className="flex justify-between items-center max-w-7xl mx-auto">
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
-              <img src="/logo.svg" alt="Logo" className="h-8 w-auto" />
+              <Image src="/logo.svg" alt="Logo" width={32} height={32} className="h-8 w-auto" />
             </Link>
           </div>
           <Link 
