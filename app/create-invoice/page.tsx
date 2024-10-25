@@ -236,7 +236,6 @@ export default function CreateInvoice() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
               <img src="/logo.svg" alt="Logo" className="h-8 w-auto" />
-              <span className="ml-2 text-xl font-bold">Your App Name</span>
             </Link>
           </div>
           <Link 
