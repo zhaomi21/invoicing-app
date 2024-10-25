@@ -31,6 +31,7 @@ interface LineItem {
   description: string;
   quantity: number;
   rate: number;
+  recurrenceSettings?: RecurrenceSettings;
 }
 
 interface Currency {
