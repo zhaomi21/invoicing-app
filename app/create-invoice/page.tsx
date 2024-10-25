@@ -470,6 +470,15 @@ export default function CreateInvoice() {
     }
   };
 
+  const handleSaveAndContinue = useCallback(() => {
+    console.log('Save and continue clicked');
+    // Save your invoice data and get the ID
+    const invoiceId = saveInvoiceData();
+    
+    // Navigate to the send-invoice page with the invoice ID
+    router.push(`/send-invoice?id=${invoiceId}`);
+  }, [router]);
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <div className="bg-gray-100 py-2 px-4 sm:px-6 lg:px-8">
@@ -926,11 +935,7 @@ export default function CreateInvoice() {
             </svg>
           </button>
           <button
-            onClick={() => {
-              console.log('Save and continue clicked');
-              // Add your save logic here
-              router.push('/send-invoice');
-            }}
+            onClick={handleSaveAndContinue}
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full shadow-lg flex items-center transition-colors duration-300"
           >
             Save and continue
