@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
-import Image from "next/image";
 import Link from "next/link";
+import Image from 'next/image';
 
 interface BusinessDetails {
   name: string;
@@ -96,9 +96,11 @@ export default function CreateInvoice() {
               >
                 {logoPreview ? (
                   <div className="relative w-full h-full">
-                    <img 
+                    <Image 
                       src={logoPreview} 
                       alt="Uploaded logo" 
+                      width={100}  // Specify appropriate width
+                      height={100} // Specify appropriate height
                       className="max-w-full max-h-full object-contain object-left absolute left-0 top-1/2 transform -translate-y-1/2"
                     />
                   </div>
