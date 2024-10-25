@@ -185,6 +185,7 @@ export default function CreateInvoice() {
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(commonCurrencies[0]);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [currentSaveItem, setCurrentSaveItem] = useState<SavedItem>({ item: '', description: '', rate: 0 });
+  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
 
   console.log('Component rendering');
 
@@ -1200,12 +1201,12 @@ export default function CreateInvoice() {
         </div>
       )}
 
-      {/* Add this new modal for saving items */}
+      {/* Save Item Modal */}
       {isSaveModalOpen && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
             <h2 className="text-2xl font-bold mb-4 text-black">Save product/service</h2>
-            <form onSubmit={handleSaveItem}>
+            <form>
               <div className="mb-4">
                 <label htmlFor="saveItem" className="block text-sm font-medium text-gray-700 mb-1">
                   Item
