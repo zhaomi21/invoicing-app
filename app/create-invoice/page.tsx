@@ -1,8 +1,9 @@
 'use client';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from "next/link";
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 
 interface BusinessDetails {
   name: string;
@@ -144,7 +145,16 @@ function InvoicePreviewModal({ isOpen, onClose, children }: { isOpen: boolean; o
   );
 }
 
+interface RecurrenceSettings {
+  frequency: 'week' | 'month' | 'year';
+  interval: number;
+  startDate: string;
+  endDate: string | null;
+  numberOfOccurrences: number | null;
+}
+
 export default function CreateInvoice() {
+  const router = useRouter();
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [businessDetails, setBusinessDetails] = useState<BusinessDetails>({
@@ -186,6 +196,17 @@ export default function CreateInvoice() {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [currentSaveItem, setCurrentSaveItem] = useState<SavedItem>({ item: '', description: '', rate: 0 });
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
+  const [invoiceData, setInvoiceData] = useState({/* your invoice data structure */});
+  const [isRecurrenceModalOpen, setIsRecurrenceModalOpen] = useState(false);
+  const [currentLineItemIndex, setCurrentLineItemIndex] = useState<number | null>(null);
+  const [recurrenceSettings, setRecurrenceSettings] = useState<RecurrenceSettings>({
+    frequency: 'month',
+    interval: 1,
+    startDate: '',
+    endDate: null,
+    numberOfOccurrences: null,
+  });
+  const [applyToAllItems, setApplyToAllItems] = useState(false);
 
   console.log('Component rendering');
 
@@ -368,6 +389,86 @@ export default function CreateInvoice() {
 
   const openPreview = () => setIsPreviewOpen(true);
   const closePreview = () => setIsPreviewOpen(false);
+
+  const openRecurrenceModal = (index: number) => {
+    setCurrentLineItemIndex(index);
+    setRecurrenceSettings(lineItems[index].recurrenceSettings || {
+      frequency: 'month',
+      interval: 1,
+      startDate: '',
+      endDate: null,
+      numberOfOccurrences: null,
+    });
+    setIsRecurrenceModalOpen(true);
+  };
+
+  const closeRecurrenceModal = () => {
+    setIsRecurrenceModalOpen(false);
+    setCurrentLineItemIndex(null);
+  };
+
+  const handleRecurrenceSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (currentLineItemIndex !== null) {
+      let updatedLineItems = [...lineItems];
+      if (applyToAllItems) {
+        updatedLineItems = updatedLineItems.map(item => ({
+          ...item,
+          recurrenceSettings: recurrenceSettings
+        }));
+      } else {
+        updatedLineItems[currentLineItemIndex] = {
+          ...updatedLineItems[currentLineItemIndex],
+          recurrenceSettings: recurrenceSettings
+        };
+      }
+      setLineItems(updatedLineItems);
+    }
+    closeRecurrenceModal();
+  };
+
+  const formatRecurrenceText = (settings: RecurrenceSettings) => {
+    const formatDate = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    };
+
+    let frequencyText = '';
+    switch (settings.frequency) {
+      case 'week':
+        frequencyText = settings.interval === 1 ? 'weekly' : `every ${settings.interval} weeks`;
+        break;
+      case 'month':
+        frequencyText = settings.interval === 1 ? 'monthly' : `every ${settings.interval} months`;
+        break;
+      case 'year':
+        frequencyText = settings.interval === 1 ? 'yearly' : `every ${settings.interval} years`;
+        break;
+    }
+
+    let endText = '';
+    if (settings.endDate) {
+      endText = ` until ${formatDate(settings.endDate)}`;
+    } else if (settings.numberOfOccurrences) {
+      endText = ` for ${settings.numberOfOccurrences} occurrence${settings.numberOfOccurrences > 1 ? 's' : ''}`;
+    }
+
+    return `Repeat ${frequencyText} starting ${formatDate(settings.startDate)}${endText}`;
+  };
+
+  const handleEndTypeChange = (endType: 'never' | 'on' | 'after') => {
+    switch (endType) {
+      case 'never':
+        setRecurrenceSettings(prev => ({ ...prev, endDate: null, numberOfOccurrences: null }));
+        break;
+      case 'on':
+        setRecurrenceSettings(prev => ({ ...prev, endDate: prev.endDate || '', numberOfOccurrences: null }));
+        break;
+      case 'after':
+        setRecurrenceSettings(prev => ({ ...prev, endDate: null, numberOfOccurrences: prev.numberOfOccurrences || 1 }));
+        break;
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
@@ -662,6 +763,19 @@ export default function CreateInvoice() {
                       </td>
                       <td className="px-4 py-2 text-right align-top text-black">
                         {selectedCurrency.symbol}{(item.quantity * item.rate).toFixed(2)}
+                        <div>
+                          <button
+                            onClick={() => openRecurrenceModal(index)}
+                            className="text-blue-500 hover:text-blue-700 underline text-sm mt-1"
+                          >
+                            {item.recurrenceSettings ? 'Edit Recurrence' : 'Set Recurrence'}
+                          </button>
+                        </div>
+                        {item.recurrenceSettings && (
+                          <div className="text-xs text-gray-600 mt-1">
+                            {formatRecurrenceText(item.recurrenceSettings)}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-2 align-top">
                         <div className="flex items-center space-x-2">
@@ -812,6 +926,11 @@ export default function CreateInvoice() {
             </svg>
           </button>
           <button
+            onClick={() => {
+              console.log('Save and continue clicked');
+              // Add your save logic here
+              router.push('/send-invoice');
+            }}
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full shadow-lg flex items-center transition-colors duration-300"
           >
             Save and continue
@@ -1250,6 +1369,137 @@ export default function CreateInvoice() {
                 <button
                   type="button"
                   onClick={closeSaveModal}
+                  className="mr-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Recurrence Modal */}
+      {isRecurrenceModalOpen && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-4 text-black">Set Recurring Invoice</h2>
+            <form onSubmit={handleRecurrenceSubmit}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Repeat every
+                </label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    value={recurrenceSettings.interval}
+                    onChange={(e) => setRecurrenceSettings({...recurrenceSettings, interval: parseInt(e.target.value)})}
+                    className="w-16 p-2 border border-gray-300 rounded-md text-black mr-2"
+                    min="1"
+                  />
+                  <select
+                    value={recurrenceSettings.frequency}
+                    onChange={(e) => setRecurrenceSettings({...recurrenceSettings, frequency: e.target.value as 'week' | 'month' | 'year'})}
+                    className="p-2 border border-gray-300 rounded-md text-black"
+                  >
+                    <option value="week">Week(s)</option>
+                    <option value="month">Month(s)</option>
+                    <option value="year">Year(s)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={recurrenceSettings.startDate}
+                  onChange={(e) => setRecurrenceSettings({...recurrenceSettings, startDate: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-md text-black"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  End
+                </label>
+                <div>
+                  <label className="inline-flex items-center">
+                    <input
+                      type="radio"
+                      checked={recurrenceSettings.endDate === null && recurrenceSettings.numberOfOccurrences === null}
+                      onChange={() => handleEndTypeChange('never')}
+                      className="form-radio"
+                    />
+                    <span className="ml-2">Never</span>
+                  </label>
+                </div>
+                <div>
+                  <label className="inline-flex items-center">
+                    <input
+                      type="radio"
+                      checked={recurrenceSettings.endDate !== null}
+                      onChange={() => handleEndTypeChange('on')}
+                      className="form-radio"
+                    />
+                    <span className="ml-2">On</span>
+                  </label>
+                  {recurrenceSettings.endDate !== null && (
+                    <input
+                      type="date"
+                      value={recurrenceSettings.endDate || ''}
+                      onChange={(e) => setRecurrenceSettings(prev => ({ ...prev, endDate: e.target.value }))}
+                      className="w-full p-2 border border-gray-300 rounded-md text-black mt-1"
+                    />
+                  )}
+                </div>
+                <div>
+                  <label className="inline-flex items-center">
+                    <input
+                      type="radio"
+                      checked={recurrenceSettings.numberOfOccurrences !== null}
+                      onChange={() => handleEndTypeChange('after')}
+                      className="form-radio"
+                    />
+                    <span className="ml-2">After</span>
+                  </label>
+                  {recurrenceSettings.numberOfOccurrences !== null && (
+                    <input
+                      type="number"
+                      value={recurrenceSettings.numberOfOccurrences}
+                      onChange={(e) => setRecurrenceSettings(prev => ({ ...prev, numberOfOccurrences: parseInt(e.target.value) }))}
+                      className="w-16 p-2 border border-gray-300 rounded-md text-black ml-2"
+                      min="1"
+                    />
+                  )}
+                  <span className="ml-2">occurrences</span>
+                </div>
+              </div>
+
+              {/* Apply to all items checkbox */}
+              <div className="mb-4">
+                <label className="inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={applyToAllItems}
+                    onChange={(e) => setApplyToAllItems(e.target.checked)}
+                    className="form-checkbox"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Apply to all line items</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={closeRecurrenceModal}
                   className="mr-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
                 >
                   Cancel
