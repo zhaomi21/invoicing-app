@@ -45,7 +45,7 @@ function Portal({ children }: { children: React.ReactNode }) {
     : null;
 }
 
-function InvoicePreviewModal({ isOpen, onClose, children }) {
+function InvoicePreviewModal({ isOpen, onClose, children }: { isOpen: boolean; onClose: () => void; children: (style: string) => React.ReactNode }) {
   const [selectedStyle, setSelectedStyle] = useState('classic');
 
   if (!isOpen) return null;
