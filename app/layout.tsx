@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${pangolin.variable}`}>
       <Head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/favicon.png" type="image/png" />
       </Head>
       <body>{children}</body>
     </html>
